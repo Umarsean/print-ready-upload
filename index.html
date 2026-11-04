@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Print Ready</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1230">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root{--bg:#1b1230;--card:#2a1e47;--line:#473668;--ink:#f3eefc;--mute:#b3a6d1;--acc:#c7a6ff}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,sans-serif}
+main{max-width:720px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 10px) 12px 40px}
+h1{font-size:20px;margin:6px 0 2px} h3{font-size:15px;margin:18px 0 8px}
+small,.fine{color:var(--mute);font-size:12px}
+button,select,input,.btn{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.btn{display:inline-block;background:var(--acc);color:#1b1230;border-color:var(--acc);font-weight:600}
+button.primary{width:100%;background:var(--acc);color:#1b1230;border-color:var(--acc);font-weight:700;padding:13px;margin-top:16px}
+.thumbs{display:flex;gap:6px;overflow-x:auto;padding:8px 0}
+.thumbs img{height:64px;border-radius:6px;border:2px solid transparent}
+.thumbs img.sel{border-color:var(--acc)}
+#pv{display:block;max-width:100%;max-height:48vh;margin:6px auto;border-radius:6px;background:#000}
+.sizes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.sizes button{text-align:left;padding:7px 9px;line-height:1.25}
+.sizes button.on{background:var(--acc);color:#1b1230;border-color:var(--acc)}
+.sizes small{display:block;color:inherit;opacity:.8}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}
+.row label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mute)}
+.row label.full{grid-column:1/-1}
+input[type=range]{padding:0;width:100%}
+input[type=color]{padding:2px;height:38px;width:100%}
+.chk{display:flex;gap:8px;align-items:center;margin:8px 0}
+.chk input{width:18px;height:18px}
+#results a{display:block;margin:6px 0;padding:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;color:var(--acc);word-break:break-all}
+#status{margin-top:10px;color:var(--mute)}
+</style>
+</head>
+<body>
+<main>
+<h1>Print Ready</h1>
+<p class="fine">Turn any image into a print-ready file at the size you choose. It all runs on your device. Nothing is uploaded.</p>
+
+<label class="btn" for="file">Choose images</label>
+<input id="file" type="file" accept="image/*" multiple hidden>
+<button id="clear">Clear</button>
+<div class="thumbs" id="thumbs"></div>
+<canvas id="pv" width="10" height="10"></canvas>
+<small id="info">No image yet.</small>
+
+<h3>Sizes <small>tap to select one or more. The dot shows print quality for the chosen image.</small></h3>
+<div class="sizes" id="sizes"></div>
+<div class="chk"><input type="checkbox" id="cuse"><span>Custom size</span></div>
+<div class="row">
+  <label>Width<input id="cw" type="number" min="1" step="any" value="200"></label>
+  <label>Height<input id="ch" type="number" min="1" step="any" value="300"></label>
+  <label class="full">Unit<select id="cu"><option value="mm">mm</option><option value="in">inches</option><option value="cm">cm</option></select></label>
+</div>
+
+<h3>Layout</h3>
+<div class="row">
+  <label>Orientation<select id="orient"><option value="auto">Match image</option><option value="port">Portrait</option><option value="land">Landscape</option></select></label>
+  <label>Mode<select id="mode"><option value="fit">Fit (whole image)</option><option value="fill">Fill (crop to cover)</option></select></label>
+  <label>Crop position left–right<input type="range" id="fx" min="0" max="100" value="50"></label>
+  <label>Crop position top–bottom<input type="range" id="fy" min="0" max="100" value="50"></label>
+  <label>Margin colour (Fit)<select id="bgmode"><option value="auto">Edge colour of image</option><option value="custom">Pick colour</option></select></label>
+  <label>Colour<input type="color" id="bgcolor" value="#ffffff"></label>
+</div>
+
+<h3>Print prep</h3>
+<div class="row">
+  <label>Bleed<select id="bleed"><option value="0">None</option><option value="3">3 mm</option><option value="5">5 mm</option></select></label>
+  <label>Sharpening<input type="range" id="sharpen" min="0" max="100" value="30"></label>
+  <label>Resolution<select id="dpi"><option value="300">300 dpi</option><option value="250">250 dpi</option><option value="200">200 dpi</option><option value="150">150 dpi</option></select></label>
+  <label>Format<select id="fmt"><option value="pdf">PDF</option><option value="jpeg">JPEG</option><option value="png">PNG</option></select></label>
+</div>
+<div class="chk"><input type="checkbox" id="marks"><span>Crop marks (PDF only)</span></div>
+<div class="chk"><input type="checkbox" id="tile"><span>Tile onto A4 sheets for a home printer (PDF)</span></div>
+
+<button class="primary" id="go">Create files</button>
+<div id="status"></div>
+<div id="results"></div>
+<p class="fine">Very large sizes are limited to a lower resolution to fit your device's memory, and the app tells you when that happens. Upscaling enlarges and sharpens only; it can't add detail the image never had. Browsers convert colours to sRGB, so original colour profiles are not kept. Only print images you own or have permission to print.</p>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const MAXPX=40e6;
+const SIZES=[["A0",841,1189],["A1",594,841],["A2",420,594],["A3",297,420],["A4",210,297],["A5",148,210],["A6",105,148],
+ ["B2",500,707],["B3",353,500],["B4",250,353],["50×70 cm",500,700],
+ ["Letter",215.9,279.4],["11×17",279.4,431.8],["18×24",457.2,609.6],["24×36",609.6,914.4],
+ ["4×6",101.6,152.4],["5×7",127,177.8],["8×10",203.2,254],["11×14",279.4,355.6],["16×20",406.4,508]];
+let imgs=[],active=0;const sel=new Set(["A4"]);
+
+const opts=()=>({orient:$("orient").value,mode:$("mode").value,fx:$("fx").value/100,fy:$("fy").value/100,
+ bgmode:$("bgmode").value,bgcolor:$("bgcolor").value,bleed:+$("bleed").value,marks:$("marks").checked,
+ sharpen:+$("sharpen").value,dpi:+$("dpi").value,fmt:$("fmt").value,tile:$("tile").checked});
+
+function getSizes(){
+  const out=SIZES.filter(s=>sel.has(s[0])).map(([name,w,h])=>({name,w,h}));
+  if($("cuse").checked){
+    const k={mm:1,cm:10,in:25.4}[$("cu").value],w=+$("cw").value*k,h=+$("ch").value*k;
+    if(w>0&&h>0) out.push({name:`${+$("cw").value}x${+$("ch").value}${$("cu").value}`,w,h});
+  }
+  return out;
+}
+function orient(w,h,im,o){
+  const a=Math.min(w,h),b=Math.max(w,h);
+  const land=o.orient==="land"||(o.orient==="auto"&&im.w>im.h);
+  return land?[b,a]:[a,b];
+}
+function layout(im,tw,th,o,b){
+  const pw=tw+2*b,ph=th+2*b,fill=o.mode==="fill";
+  const aw=fill?pw:tw,ah=fill?ph:th,ox=fill?0:b,oy=fill?0:b;
+  const s=fill?Math.max(aw/im.w,ah/im.h):Math.min(aw/im.w,ah/im.h);
+  const iw=im.w*s,ih=im.h*s,fx=fill?o.fx:.5,fy=fill?o.fy:.5;
+  return{pw,ph,iw,ih,ix:ox+(aw-iw)*fx,iy:oy+(ah-ih)*fy};
+}
+const bgOf=(o,im)=>o.bgmode==="auto"?im.edge:o.bgcolor;
+function render(ctx,im,L,ppm,tx,ty,bg){
+  ctx.save();ctx.translate(-tx,-ty);
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,L.pw*ppm+2,L.ph*ppm+2);
+  ctx.fillStyle=bg;ctx.fillRect(0,0,L.pw*ppm,L.ph*ppm);
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+  ctx.drawImage(im.img,L.ix*ppm,L.iy*ppm,L.iw*ppm,L.ih*ppm);
+  ctx.restore();
+}
+function edgeColor(img){
+  const n=64,c=document.createElement("canvas");c.width=c.height=n;
+  const x=c.getContext("2d",{willReadFrequently:true});x.drawImage(img,0,0,n,n);
+  const d=x.getImageData(0,0,n,n).data;let r=0,g=0,b=0,k=0;
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++)if(i<3||j<3||i>=n-3||j>=n-3){const p=(i*n+j)*4;r+=d[p];g+=d[p+1];b+=d[p+2];k++}
+  return`rgb(${Math.round(r/k)},${Math.round(g/k)},${Math.round(b/k)})`;
+}
+const tick=()=>new Promise(r=>setTimeout(r));
+async function sharpen(c,amt){
+  if(amt<=0)return;
+  const ctx=c.getContext("2d",{willReadFrequently:true}),W=c.width,H=c.height,k=amt*0.6,B=200;
+  for(let y0=0;y0<H;y0+=B){
+    const h=Math.min(B,H-y0),ys=Math.max(0,y0-1),ye=Math.min(H,y0+h+1),rows=ye-ys;
+    const s=ctx.getImageData(0,ys,W,rows).data,out=ctx.createImageData(W,h),o=out.data;
+    for(let y=0;y<h;y++){
+      const sy=y0+y-ys,up=Math.max(sy-1,0),dn=Math.min(sy+1,rows-1);
+      for(let x=0;x<W;x++){
+        const p=(sy*W+x)*4,u=(up*W+x)*4,d=(dn*W+x)*4,l=(sy*W+Math.max(x-1,0))*4,r=(sy*W+Math.min(x+1,W-1))*4,q=(y*W+x)*4;
+        o[q]=s[p]+k*(4*s[p]-s[u]-s[d]-s[l]-s[r]);
+        o[q+1]=s[p+1]+k*(4*s[p+1]-s[u+1]-s[d+1]-s[l+1]-s[r+1]);
+        o[q+2]=s[p+2]+k*(4*s[p+2]-s[u+2]-s[d+2]-s[l+2]-s[r+2]);
+        o[q+3]=255;
+      }
+    }
+    ctx.putImageData(out,0,y0);
+    await tick();
+  }
+}
+const toBlob=(c,t,q)=>new Promise(r=>c.toBlob(r,t,q));
+const bytesOf=async b=>{if(!b)throw new Error("The device ran out of memory. Pick a lower resolution or smaller size.");return new Uint8Array(await b.arrayBuffer())};
+
+/* CRC32, PNG/JPEG dpi tags, PDF and ZIP writers */
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(d,c=0xFFFFFFFF){for(let i=0;i<d.length;i++)c=CRC[(c^d[i])&255]^(c>>>8);return c}
+function patchJPEG(b,dpi){
+  if(b[2]===0xFF&&b[3]===0xE0&&b[6]===0x4A&&b[7]===0x46){b[13]=1;b[14]=b[16]=dpi>>8;b[15]=b[17]=dpi&255}
+  return b;
+}
+function patchPNG(b,dpi){
+  const ppm=Math.round(dpi/0.0254),ch=new Uint8Array(21),dv=new DataView(ch.buffer);
+  dv.setUint32(0,9);ch.set([0x70,0x48,0x59,0x73],4);dv.setUint32(8,ppm);dv.setUint32(12,ppm);ch[16]=1;
+  dv.setUint32(17,(crc32(ch.subarray(4,17))^0xFFFFFFFF)>>>0);
+  const o=new Uint8Array(b.length+21);o.set(b.subarray(0,33));o.set(ch,33);o.set(b.subarray(33),54);
+  return o;
+}
+function buildPDF(pages){
+  const enc=new TextEncoder(),parts=[],offs=[];let len=0;
+  const add=x=>{if(typeof x==="string")x=enc.encode(x);parts.push(x);len+=x.length};
+  const obj=(n,body)=>{offs[n]=len;add(`${n} 0 obj\n${body}\nendobj\n`)};
+  const stream=(n,dict,data)=>{offs[n]=len;add(`${n} 0 obj\n<<${dict} /Length ${data.length}>>\nstream\n`);add(data);add("\nendstream\nendobj\n")};
+  const N=3+3*pages.length,f=v=>v.toFixed(2);
+  add("%PDF-1.4\n");
+  obj(1,"<< /Type /Catalog /Pages 2 0 R >>");
+  obj(2,`<< /Type /Pages /Kids [${pages.map((_,i)=>`${6+i*3} 0 R`).join(" ")}] /Count ${pages.length} >>`);
+  obj(3,"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  pages.forEach((p,i)=>{
+    const im=4+i*3,ct=5+i*3,pg=6+i*3;
+    stream(im,`/Type /XObject /Subtype /Image /Width ${p.iw} /Height ${p.ih} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode`,p.jpg);
+    stream(ct,"",enc.encode(`q ${f(p.dw)} 0 0 ${f(p.dh)} ${f(p.x)} ${f(p.y)} cm /Im0 Do Q\n${p.extra||""}`));
+    obj(pg,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${f(p.w)} ${f(p.h)}] /Resources << /XObject << /Im0 ${im} 0 R >> /Font << /F1 3 0 R >> >> /Contents ${ct} 0 R >>`);
+  });
+  const xr=len;add(`xref\n0 ${N+1}\n0000000000 65535 f \n`);
+  for(let n=1;n<=N;n++)add(String(offs[n]).padStart(10,"0")+" 00000 n \n");
+  add(`trailer\n<< /Size ${N+1} /Root 1 0 R >>\nstartxref\n${xr}\n%%EOF`);
+  return new Blob(parts,{type:"application/pdf"});
+}
+function buildZip(files){
+  const enc=new TextEncoder(),parts=[],cen=[];let off=0;
+  for(const fl of files){
+    const nm=enc.encode(fl.name),crc=(crc32(fl.data)^0xFFFFFFFF)>>>0,sz=fl.data.length;
+    const h=new DataView(new ArrayBuffer(30));
+    h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(12,0x21,true);
+    h.setUint32(14,crc,true);h.setUint32(18,sz,true);h.setUint32(22,sz,true);h.setUint16(26,nm.length,true);
+    parts.push(new Uint8Array(h.buffer),nm,fl.data);
+    const c=new DataView(new ArrayBuffer(46));
+    c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(14,0x21,true);
+    c.setUint32(16,crc,true);c.setUint32(20,sz,true);c.setUint32(24,sz,true);c.setUint16(28,nm.length,true);c.setUint32(42,off,true);
+    cen.push(new Uint8Array(c.buffer),nm);
+    off+=30+nm.length+sz;
+  }
+  let cl=0;cen.forEach(x=>cl+=x.length);
+  const e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cl,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...cen,new Uint8Array(e.buffer)],{type:"application/zip"});
+}
+
+/* quality + UI */
+function dpiFor(im,s,o){
+  const[tw,th]=orient(s.w,s.h,im,o),L=layout(im,tw,th,o,o.tile?0:o.bleed);
+  return Math.round(im.w/(L.iw/25.4));
+}
+function rate(d){return d>=250?["#4ade80","Excellent"]:d>=180?["#a3e635","Good"]:d>=120?["#fbbf24","OK at a distance"]:["#f87171","Soft"]}
+function drawThumbs(){
+  $("thumbs").innerHTML="";
+  imgs.forEach((im,i)=>{const t=document.createElement("img");t.src=im.url;t.className=i===active?"sel":"";t.onclick=()=>{active=i;refresh()};$("thumbs").appendChild(t)});
+}
+function drawSizes(){
+  const o=opts(),im=imgs[active];$("sizes").innerHTML="";
+  SIZES.forEach(([name,w,h])=>{
+    const b=document.createElement("button"),on=sel.has(name);b.className=on?"on":"";
+    let q="";
+    if(im){const d=dpiFor(im,{w,h},o),[c]=rate(d);q=`<span class="dot" style="background:${c}"></span>${d} dpi`}
+    b.innerHTML=`${name}<small>${w}×${h} mm · ${q}</small>`;
+    b.onclick=()=>{on?sel.delete(name):sel.add(name);refresh()};
+    $("sizes").appendChild(b);
+  });
+}
+function drawPreview(){
+  const im=imgs[active],c=$("pv"),o=opts();
+  if(!im){c.width=c.height=10;$("info").textContent="No image yet.";return}
+  const s=getSizes()[0]||{w:210,h:297},[tw,th]=orient(s.w,s.h,im,o),b=o.tile?0:o.bleed,L=layout(im,tw,th,o,b);
+  c.width=320;c.height=Math.round(320*L.ph/L.pw);const ppm=320/L.pw,ctx=c.getContext("2d");
+  render(ctx,im,L,ppm,0,0,bgOf(o,im));
+  if(b>0){ctx.setLineDash([5,4]);ctx.strokeStyle="#f87171";ctx.strokeRect(b*ppm,b*ppm,tw*ppm,th*ppm)}
+  const d=dpiFor(im,s,o),[,t]=rate(d);
+  $("info").textContent=`${im.name}: ${im.w}×${im.h} px. Preview of ${s.name||"size"}: about ${d} dpi (${t}).`+(b>0?" Red dashes show the trim line.":"");
+}
+function refresh(){drawThumbs();drawSizes();drawPreview()}
+
+$("file").onchange=async e=>{
+  for(const f of e.target.files){
+    const url=URL.createObjectURL(f),img=new Image();img.src=url;
+    try{await img.decode()}catch{continue}
+    imgs.push({name:f.name.replace(/\.[^.]+$/,"").replace(/[^A-Za-z0-9-]+/g,"-"),url,img,w:img.naturalWidth,h:img.naturalHeight,edge:edgeColor(img)});
+  }
+  e.target.value="";active=Math.min(active,Math.max(0,imgs.length-1));refresh();
+};
+$("clear").onclick=()=>{imgs=[];active=0;$("results").innerHTML="";$("status").textContent="";refresh()};
+document.querySelectorAll("select,input[type=range],input[type=number],input[type=color],input[type=checkbox]").forEach(el=>{el.addEventListener("input",refresh)});
+
+/* output */
+const f2=v=>v.toFixed(2),esc=s=>s.replace(/[^\x20-\x7E]/g,"x").replace(/([\\()])/g,"\\$1");
+function marksStr(S,b,tw,th){
+  const f=72/25.4,x0=(S+b)*f,y0=(S+b)*f,x1=x0+tw*f,y1=y0+th*f,off=(b+1)*f,L=5*f;let s="0.25 w 0 0 0 RG\n";
+  const ln=(a,b2,c,d)=>{s+=`${f2(a)} ${f2(b2)} m ${f2(c)} ${f2(d)} l S\n`};
+  for(const[cx,sx]of[[x0,-1],[x1,1]])for(const[cy,sy]of[[y0,-1],[y1,1]]){
+    ln(cx+sx*off,cy,cx+sx*(off+L),cy);ln(cx,cy+sy*off,cx,cy+sy*(off+L));
+  }
+  return s;
+}
+async function makeOne(im,s,o,notes){
+  const[tw,th]=orient(s.w,s.h,im,o),sname=s.name.replace(/×/g,"x").replace(/[^A-Za-z0-9.-]+/g,"-");
+  if(o.tile){
+    const L=layout(im,tw,th,o,0),m=5,uw=200,uh=287,ov=10,f=72/25.4;
+    const cols=Math.max(1,Math.ceil((tw-ov)/(uw-ov))),rows=Math.max(1,Math.ceil((th-ov)/(uh-ov)));
+    const dpi=Math.min(o.dpi,300),ppm=dpi/25.4,pages=[];
+    for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+      const cv=document.createElement("canvas");cv.width=Math.round(uw*ppm);cv.height=Math.round(uh*ppm);
+      const ctx=cv.getContext("2d",{willReadFrequently:o.sharpen>0});
+      render(ctx,im,L,ppm,c*(uw-ov)*ppm,r*(uh-ov)*ppm,bgOf(o,im));
+      await sharpen(cv,o.sharpen/100);
+      const jpg=await bytesOf(await toBlob(cv,"image/jpeg",.92)),W=cv.width,H=cv.height;cv.width=cv.height=0;
+      const X0=m*f,Y0=m*f,X1=(m+uw)*f,Y1=(m+uh)*f,t=3*f,g=.5*f;let ex="0.25 w 0 0 0 RG\n";
+      for(const x of[X0,X1])for(const y of[Y0,Y1]){const sx=x===X0?-1:1,sy=y===Y0?-1:1;
+        ex+=`${f2(x+sx*g)} ${f2(y)} m ${f2(x+sx*(g+t))} ${f2(y)} l S\n${f2(x)} ${f2(y+sy*g)} m ${f2(x)} ${f2(y+sy*(g+t))} l S\n`}
+      ex+=`BT /F1 7 Tf ${f2(X0)} ${f2(2*f)} Td (${esc(`${s.name} - row ${r+1} of ${rows}, column ${c+1} of ${cols} - overlap ${ov} mm`)}) Tj ET\n`;
+      pages.push({w:210*f,h:297*f,jpg,iw:W,ih:H,x:X0,y:Y0,dw:uw*f,dh:uh*f,extra:ex});
+      await tick();
+    }
+    const blob=buildPDF(pages);
+    return{name:`${im.name}_${sname}_tiled-A4-${cols}x${rows}.pdf`,data:new Uint8Array(await blob.arrayBuffer()),mime:"application/pdf"};
+  }
+  const b=o.bleed,L=layout(im,tw,th,o,b),areaIn=(L.pw/25.4)*(L.ph/25.4);
+  const dpi=Math.max(72,Math.min(o.dpi,Math.floor(Math.sqrt(MAXPX/areaIn))));
+  if(dpi<o.dpi)notes.push(`${s.name} was limited to ${dpi} dpi to fit device memory.`);
+  const ppm=dpi/25.4,cv=document.createElement("canvas");cv.width=Math.round(L.pw*ppm);cv.height=Math.round(L.ph*ppm);
+  const ctx=cv.getContext("2d",{willReadFrequently:o.sharpen>0});
+  render(ctx,im,L,ppm,0,0,bgOf(o,im));await sharpen(cv,o.sharpen/100);
+  const base=`${im.name}_${sname}_${dpi}dpi${b?`_${b}mm-bleed`:""}`;
+  let res;
+  if(o.fmt==="png"){res={name:base+".png",data:patchPNG(await bytesOf(await toBlob(cv,"image/png")),dpi),mime:"image/png"}}
+  else{
+    const jpg=patchJPEG(await bytesOf(await toBlob(cv,"image/jpeg",.95)),dpi);
+    if(o.fmt==="jpeg")res={name:base+".jpg",data:jpg,mime:"image/jpeg"};
+    else{
+      const f=72/25.4,S=o.marks?8:0;
+      const blob=buildPDF([{w:(L.pw+2*S)*f,h:(L.ph+2*S)*f,jpg,iw:cv.width,ih:cv.height,x:S*f,y:S*f,dw:L.pw*f,dh:L.ph*f,extra:o.marks?marksStr(S,b,tw,th):""}]);
+      res={name:base+(o.marks?"_marks":"")+".pdf",data:new Uint8Array(await blob.arrayBuffer()),mime:"application/pdf"};
+    }
+  }
+  cv.width=cv.height=0;return res;
+}
+$("go").onclick=async()=>{
+  const o=opts(),sizes=getSizes(),st=$("status"),rs=$("results");rs.innerHTML="";
+  if(!imgs.length||!sizes.length){st.textContent="Choose at least one image and one size.";return}
+  $("go").disabled=true;const files=[],notes=[],names=new Set();let n=0;
+  try{
+    for(const im of imgs)for(const s of sizes){
+      st.textContent=`Working on ${++n} of ${imgs.length*sizes.length}…`;await tick();
+      const r=await makeOne(im,s,o,notes);
+      while(names.has(r.name))r.name=r.name.replace(/(\.[a-z]+)$/,"-2$1");
+      names.add(r.name);files.push(r);
+    }
+    const link=(blob,name,label)=>{const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.textContent=label;rs.appendChild(a)};
+    if(files.length>1)link(buildZip(files),"print-ready.zip",`Download all (${files.length} files, .zip)`);
+    files.forEach(fl=>link(new Blob([fl.data],{type:fl.mime}),fl.name,`${fl.name}  (${(fl.data.length/1e6).toFixed(1)} MB)`));
+    st.textContent="Done. "+notes.join(" ");
+  }catch(e){st.textContent="Something went wrong: "+e.message}
+  $("go").disabled=false;
+};
+refresh();
+if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+</script>
+</body>
+</html>
